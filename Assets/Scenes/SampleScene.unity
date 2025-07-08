@@ -569,6 +569,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cubePrefab: {fileID: 5423221523551792031, guid: 3660674b64faea9499f91a2834715b24, type: 3}
+  pre: {fileID: 2100000, guid: 5030f4a521d892d4189af0048b503a94, type: 2}
+  post: {fileID: 2100000, guid: aa2c2fad5ba356540a1270cac845f569, type: 2}
+  diceNets: []
 --- !u!4 &1783781492
 Transform:
   m_ObjectHideFlags: 0
