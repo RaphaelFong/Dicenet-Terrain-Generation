@@ -9,7 +9,7 @@ public class GridBuilder : MonoBehaviour
     public Material pre;
     public Material post;
     public const int GRIDSIZE = 20;
-    public const float TILESIZE = 1f;
+    public const float TILESIZE = 1f; // my cubePrefab are slightly smaller than tileSize so can tell apart from each other
 
     public Dictionary<Vector3, GameObject> tileMap = new Dictionary<Vector3, GameObject>();
     public List<Dicenet> diceNets = new List<Dicenet>(); // Stores the 11 polyhedral dicenets
@@ -19,9 +19,14 @@ public class GridBuilder : MonoBehaviour
     void Start()
     {
         LoadDicenets();
-        //VisualizeDicenet(0); // uncomment this and comment build grid to debug dicenet
+        //VisualizeDicenet(2); // uncomment this and comment build grid to debug dicenet
         BuildGrid();
-        PlaceDicenet();
+        PlaceDicenet(2);
+        PlaceDicenet(2);
+        PlaceDicenet(2);
+        PlaceDicenet(2);
+        PlaceDicenet(1);
+        PlaceDicenet(0);
     }
 
     // Builds from bot left (0,0,0) to top right (19,0,19)
@@ -44,8 +49,17 @@ public class GridBuilder : MonoBehaviour
         Debug.Log($"Grid created with {tileMap.Count} tiles.");
     }
 
-    void PlaceDicenet()
+    void PlaceDicenet(int diceNetIndex)
     {
+        //int diceNetIndex = 2;
+
+        if (diceNetIndex > diceNets.Capacity - 1)
+        {
+            Debug.LogWarning("diceNetIndex out of bounds!"); ;
+        }
+
+        bool didZShift = true;
+
         // Placing First Dicenet
         if (IsGridEmpty())
         {
@@ -57,9 +71,7 @@ public class GridBuilder : MonoBehaviour
             {
                 tempHolder.Clear();
 
-                Debug.Log("diceNets[0].offsets.Length : " + diceNets[0].offsets.Length);
-
-                foreach (Vector3 v3 in diceNets[0].offsets)
+                foreach (Vector3 v3 in diceNets[diceNetIndex].offsets)
                 {
                     Vector3 newPos = targetPos + v3;
 
@@ -72,16 +84,20 @@ public class GridBuilder : MonoBehaviour
                     }
                     else
                     {
-                        if (targetPos.z < TILESIZE)
+                        // This part of the algo shd consult chaw cos the placement gonna look weird
+                        // He ok then ok ?
+                        if (targetPos.z < GRIDSIZE && didZShift)
                         {
-                            Debug.Log("Attempting to +1 z");
+                            //Debug.Log("Attempting to +1 z");
                             targetPos.z += 1; // shift up 
+                            didZShift = !didZShift;
                             break;
                         }
-                        else if (targetPos.x < TILESIZE)
+                        else if (targetPos.x < GRIDSIZE)
                         {
-                            Debug.Log("Attempting to +1 x");
+                            //Debug.Log("Attempting to +1 x");
                             targetPos.x += 1; // shift right
+                            didZShift = !didZShift;
                             break;
                         }
                         else
@@ -93,7 +109,7 @@ public class GridBuilder : MonoBehaviour
 
                     }
 
-                    if (v3 == diceNets[0].offsets[diceNets[0].offsets.Length - 1])
+                    if (v3 == diceNets[diceNetIndex].offsets[diceNets[diceNetIndex].offsets.Length - 1])
                     {
                         placedSuccessful = true;
                     }
@@ -105,6 +121,79 @@ public class GridBuilder : MonoBehaviour
                 tileMap[v3].GetComponent<TileData>().isValid = true;
                 tileMap[v3].GetComponent<Renderer>().material = post;
             }
+            Debug.Log("Complete Placing First Dicenet");
+        }
+        
+        // This one need calculate adjacency score
+        else
+        {
+            #region GPT - with no consideration to rotation yet
+
+            int bestScore = -1;
+            Vector3 bestPlacement = Vector3.zero;
+            List<Vector3> bestTilePositions = new();
+
+            for (int x = 0; x < GRIDSIZE; x++)
+            {
+                for (int z = 0; z < GRIDSIZE; z++)
+                {
+                    Vector3 basePos = new Vector3(x, 0, z);
+                    List<Vector3> potentialTiles = new();
+                    bool canPlace = true;
+                    int score = 0;
+
+                    foreach (Vector3 offset in diceNets[diceNetIndex].offsets)
+                    {
+                        Vector3 newPos = basePos + offset;
+
+                        if (!tileMap.ContainsKey(newPos)) { canPlace = false; break; }
+
+                        var tile = tileMap[newPos].GetComponent<TileData>();
+                        if (tile.isValid) { canPlace = false; break; }
+
+                        potentialTiles.Add(newPos);
+
+                        // Score this tile's 4 neighbors
+                        foreach (Vector3 dir in new Vector3[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right })
+                        {
+                            Vector3 neighbor = newPos + dir;
+                            if (tileMap.ContainsKey(neighbor))
+                            {
+                                if (tileMap[neighbor].GetComponent<TileData>().isValid)
+                                {
+                                    score++;
+                                }
+                            }
+                        }
+                    }
+
+                    if (canPlace && score > bestScore)
+                    {
+                        bestScore = score;
+                        bestPlacement = basePos;
+                        bestTilePositions = new List<Vector3>(potentialTiles);
+                    }
+                }
+            }
+
+            if (bestTilePositions.Count > 0)
+            {
+                foreach (Vector3 pos in bestTilePositions)
+                {
+                    tileMap[pos].GetComponent<TileData>().isValid = true;
+                    tileMap[pos].GetComponent<Renderer>().material = post;
+                }
+                //StartCoroutine(PlaceTilesWithDelay(bestTilePositions));
+
+                Debug.Log($"Placed DiceNet at {bestPlacement} with adjacency score: {bestScore}");
+            }
+            else
+            {
+                Debug.LogError("No valid placement found!");
+            }
+
+
+            #endregion
         }
     }
 
@@ -124,6 +213,16 @@ public class GridBuilder : MonoBehaviour
         return true;
     }
 
+    //IEnumerator PlaceTilesWithDelay(List<Vector3> tilePos)
+    //{
+    //    foreach(Vector3 pos in tilePos)
+    //    {
+    //        tileMap[pos].GetComponent<TileData>().isValid = true;
+    //        tileMap[pos].GetComponent<Renderer>().material = post;
+    //        yield return new WaitForSeconds(1f);
+    //    }
+    //}
+
     void LoadDicenets()
     {
 
@@ -142,6 +241,40 @@ public class GridBuilder : MonoBehaviour
             new Vector3(1, 0, -2),
             new Vector3(1, 0, -3),
         }));
+
+
+        /*
+        0 0 X 
+        0 X X
+        X X 0
+        X 0 0
+         */
+        diceNets.Add(new Dicenet(new Vector3[]
+        {
+            new Vector3(0, 0, 0),
+            new Vector3(-1, 0, -1),
+            new Vector3(0, 0, -1),
+            new Vector3(-2, 0, -2),
+            new Vector3(-1, 0, -2),
+            new Vector3(-2, 0, -3),
+        }));
+
+        /*
+        0 X
+        0 X
+        X X
+        X 0
+        X 0
+         */
+        diceNets.Add(new Dicenet(new Vector3[]
+        {
+            new Vector3(0, 0, 0),
+            new Vector3(0, 0, -1),
+            new Vector3(-1, 0, -2),
+            new Vector3(0, 0, -2),
+            new Vector3(-1, 0, -3),
+            new Vector3(-1, 0, -4),
+        }));
     }
 
     // Debugging the shape of dicenet
@@ -150,8 +283,6 @@ public class GridBuilder : MonoBehaviour
     {
         foreach(Vector3 v3 in diceNets[index].offsets)
         {
-            //Vector3 pos = new Vector3(x * TILESIZE, 0, z * TILESIZE);
-
             GameObject tile = Instantiate(cubePrefab, v3, Quaternion.identity, transform);
         }   
     }
