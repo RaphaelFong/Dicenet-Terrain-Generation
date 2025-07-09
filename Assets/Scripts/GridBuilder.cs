@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
 
@@ -8,6 +10,10 @@ public class GridBuilder : MonoBehaviour
     public GameObject cubePrefab; // Each cubePrefab has a TileData attached
     public Material pre;
     public Material post;
+    public Material recent;
+    public TextMeshProUGUI targetDicenetText;   
+    public TextMeshProUGUI warningText;
+
     public const int GRIDSIZE = 20;
     public const float TILESIZE = 1f; // my cubePrefab are slightly smaller than tileSize so can tell apart from each other
 
@@ -15,18 +21,54 @@ public class GridBuilder : MonoBehaviour
     public List<Dicenet> diceNets = new List<Dicenet>(); // Stores the 11 polyhedral dicenets
     public List<Vector3> tempHolder; // remember to clear after using
 
+    public List<GameObject> mostRecentlyPlaced;
+
+    public List<int> bag; // a bag is just a list of ints ig? eg 0010123
+    public int bagIndex = 0; // index to traverse thru the bag
+    public int targetDicenet = 0; // default set to 0th element in the diceNet list
+
     // Start is called before the first frame update
     void Start()
     {
         LoadDicenets();
-        //VisualizeDicenet(2); // uncomment this and comment build grid to debug dicenet
+        //VisualizeDicenet(10); // uncomment this and comment build grid to debug dicenet
         BuildGrid();
-        PlaceDicenet(2);
-        PlaceDicenet(2);
-        PlaceDicenet(2);
-        PlaceDicenet(2);
-        PlaceDicenet(1);
-        PlaceDicenet(0);
+        //PlaceDicenet(2);
+        //PlaceDicenet(2);
+        //PlaceDicenet(2);
+        //PlaceDicenet(2);
+        //PlaceDicenet(1);
+        //PlaceDicenet(0);
+
+        foreach (int i in bag)
+        {
+            PlaceDicenet(i);
+        }
+
+        targetDicenetText.text = "Selected Dicenet Index : " + targetDicenet;
+    }
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Alpha1) && targetDicenet != diceNets.Count - 1) 
+        {
+            targetDicenet++;
+            //targetDicenet %= diceNets.Capacity;
+            targetDicenetText.text = "Selected Dicenet Index : " + targetDicenet;
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha2) && targetDicenet != 0)
+        {
+            targetDicenet--;
+            //targetDicenet %= diceNets.Capacity;
+            targetDicenetText.text = "Selected Dicenet Index : " + targetDicenet;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            //bagIndex++;
+            //bagIndex %= bag.Capacity;
+            PlaceDicenet(targetDicenet);
+        }
     }
 
     // Builds from bot left (0,0,0) to top right (19,0,19)
@@ -51,8 +93,6 @@ public class GridBuilder : MonoBehaviour
 
     void PlaceDicenet(int diceNetIndex)
     {
-        //int diceNetIndex = 2;
-
         if (diceNetIndex > diceNets.Capacity - 1)
         {
             Debug.LogWarning("diceNetIndex out of bounds!"); ;
@@ -104,7 +144,8 @@ public class GridBuilder : MonoBehaviour
                         {
                             // if reach here means no space on tile to place the dicenet
                             placedSuccessful = true; // sounds weird but we jus wanna break outta loop
-                            Debug.LogError("Insufficient space on tile!!!");
+                            warningText.text = "Insufficient space on board for dicenet index " + diceNetIndex;
+                            Debug.LogError("Insufficient space on board!");
                         }
 
                     }
@@ -176,12 +217,23 @@ public class GridBuilder : MonoBehaviour
                 }
             }
 
+            // Clean up mostRecentlyPlaced
+
+            foreach (GameObject go in mostRecentlyPlaced)
+            {
+                go.GetComponent<Renderer>().material = post;
+            }
+            mostRecentlyPlaced.Clear();
+
             if (bestTilePositions.Count > 0)
             {
                 foreach (Vector3 pos in bestTilePositions)
                 {
                     tileMap[pos].GetComponent<TileData>().isValid = true;
-                    tileMap[pos].GetComponent<Renderer>().material = post;
+                    //tileMap[pos].GetComponent<Renderer>().material = post;
+                    tileMap[pos].GetComponent<Renderer>().material = recent;
+
+                    mostRecentlyPlaced.Add(tileMap[pos]);
                 }
                 //StartCoroutine(PlaceTilesWithDelay(bestTilePositions));
 
@@ -189,6 +241,7 @@ public class GridBuilder : MonoBehaviour
             }
             else
             {
+                warningText.text = "Insufficient space on board for dicenet index " + diceNetIndex;
                 Debug.LogError("No valid placement found!");
             }
 
@@ -225,7 +278,7 @@ public class GridBuilder : MonoBehaviour
 
     void LoadDicenets()
     {
-
+        // index 0
         /*
         X X X 
           X
@@ -242,7 +295,155 @@ public class GridBuilder : MonoBehaviour
             new Vector3(1, 0, -3),
         }));
 
+        // index 1
+        /*
+        0 X X 
+        X X 0
+        0 X 0
+        0 X 0
+         */
 
+        diceNets.Add(new Dicenet(new Vector3[]
+        {
+            new Vector3(0, 0, 0),
+            new Vector3(1, 0, 0),
+            new Vector3(-1, 0, -1),
+            new Vector3(0, 0, -1),
+            new Vector3(0, 0, -2),
+            new Vector3(0, 0, -3),
+        }));
+
+        // index 2
+        /*
+        0 X X 
+        0 X 0
+        X X 0
+        0 X 0
+         */
+
+        diceNets.Add(new Dicenet(new Vector3[]
+        {
+            new Vector3(0, 0, 0),
+            new Vector3(1, 0, 0),
+            new Vector3(0, 0, -1),
+            new Vector3(-1, 0, -2),
+            new Vector3(0, 0, -2),
+            new Vector3(0, 0, -3),
+        }));
+
+        // index 3
+        /*
+        0 X X 
+        0 X 0
+        0 X 0
+        X X 0
+         */
+
+        diceNets.Add(new Dicenet(new Vector3[]
+        {
+            new Vector3(0, 0, 0),
+            new Vector3(1, 0, 0),
+            new Vector3(0, 0, -1),
+            new Vector3(0, 0, -2),
+            new Vector3(-1, 0, -3),
+            new Vector3(0, 0, -3),
+        }));
+
+        // index 4
+        /*
+        0 X X 
+        0 X 0
+        0 X 0
+        X X 0
+         */
+
+        diceNets.Add(new Dicenet(new Vector3[]
+        {
+            new Vector3(0, 0, 0),
+            new Vector3(0, 0, -1),
+            new Vector3(1, 0, -1),
+            new Vector3(-1, 0, -2),
+            new Vector3(0, 0, -2),
+            new Vector3(0, 0, -3),
+        }));
+
+        // index 5
+        /*
+        0 X 0 
+        X X X
+        0 X 0
+        0 X 0
+         */
+
+        diceNets.Add(new Dicenet(new Vector3[]
+        {
+            new Vector3(0, 0, 0),
+            new Vector3(-1, 0, -1),
+            new Vector3(0, 0, -1),
+            new Vector3(1, 0, -1),
+            new Vector3(0, 0, -2),
+            new Vector3(0, 0, -3),
+        }));
+
+
+        // index 6
+        /*
+        0 0 X
+        X X X
+        0 X 0
+        0 X 0
+         */
+
+        diceNets.Add(new Dicenet(new Vector3[]
+        {
+            new Vector3(0, 0, 0),
+            new Vector3(-2, 0, -1),
+            new Vector3(-1, 0, -1),
+            new Vector3(0, 0, -1),
+            new Vector3(-1, 0, -2),
+            new Vector3(-1, 0, -3),
+        }));
+
+
+        // index 7
+        /*
+        0 0 X
+        0 X X
+        X X 0
+        0 X 0
+         */
+
+        diceNets.Add(new Dicenet(new Vector3[]
+        {
+            new Vector3(0, 0, 0),
+            new Vector3(-1, 0, -1),
+            new Vector3(0, 0, -1),
+            new Vector3(-2, 0, -2),
+            new Vector3(-1, 0, -2),
+            new Vector3(-1, 0, -3),
+        }));
+
+        // index 8
+        /*
+        0 X X
+        0 X 0
+        X X 0
+        X 0 0
+         */
+
+        diceNets.Add(new Dicenet(new Vector3[]
+        {
+            new Vector3(0, 0, 0),
+            new Vector3(1, 0, 0),
+            new Vector3(0, 0, -1),
+            new Vector3(-1, 0, -2),
+            new Vector3(0, 0, -2),
+            new Vector3(-1, 0, -3),
+        }));
+
+
+
+        // index 9
         /*
         0 0 X 
         0 X X
@@ -259,6 +460,7 @@ public class GridBuilder : MonoBehaviour
             new Vector3(-2, 0, -3),
         }));
 
+        // index 10
         /*
         0 X
         0 X
@@ -287,8 +489,5 @@ public class GridBuilder : MonoBehaviour
         }   
     }
 
-    void Update()
-    {
-        
-    }
+
 }
