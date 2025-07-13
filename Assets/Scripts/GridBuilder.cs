@@ -1,9 +1,30 @@
+using Palmmedia.ReportGenerator.Core.Parser.Analysis;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
+//using static UnityEditor.Experimental.GraphView.GraphView;
+//using UnityEngine.Assertions;
+
+using Vector3 = UnityEngine.Vector3;
+using Quaternion = UnityEngine.Quaternion;
+
+public enum BiomeType
+{
+    UNASSIGNED, // ALL TILE BY DEFAULT SHOULD BE UNASSIGNED !
+    WATER,
+    BEACH,
+    PLAINS,
+    FOREST,
+    MOUNTAIN,
+    SNOW,
+    DESERT,
+    SWAMP,
+    VOLCANIC
+};
 
 public class GridBuilder : MonoBehaviour
 {
@@ -18,19 +39,24 @@ public class GridBuilder : MonoBehaviour
     public const float TILESIZE = 1f; // my cubePrefab are slightly smaller than tileSize so can tell apart from each other
 
     public Dictionary<Vector3, GameObject> tileMap = new Dictionary<Vector3, GameObject>();
-    public List<Dicenet> diceNets = new List<Dicenet>(); // Stores the 11 polyhedral dicenets
+    private List<Dicenet> diceNets = new List<Dicenet>(); // Stores the 11 polyhedral dicenets
     public List<Vector3> tempHolder; // remember to clear after using
 
-    public List<GameObject> mostRecentlyPlaced;
+    public List<GameObject> mostRecentlyPlaced; // just for some "highlighting" effects
 
     public List<int> bag; // a bag is just a list of ints ig? eg 0010123
     public int bagIndex = 0; // index to traverse thru the bag
     public int targetDicenet = 0; // default set to 0th element in the diceNet list
 
+    // stores the allowed neighbours in 4 directions UP DOWN LEFT RIGHT
+    public Dictionary<BiomeType, List<BiomeType>> heuristics = new Dictionary<BiomeType, List<BiomeType>>(); 
+
     // Start is called before the first frame update
     void Start()
     {
         LoadDicenets();
+        LoadHeuristics();
+
         //VisualizeDicenet(10); // uncomment this and comment build grid to debug dicenet
         BuildGrid();
         //PlaceDicenet(2);
@@ -46,6 +72,8 @@ public class GridBuilder : MonoBehaviour
         }
 
         targetDicenetText.text = "Selected Dicenet Index : " + targetDicenet;
+    
+        BuildBiomes();
     }
 
     void Update()
@@ -478,6 +506,140 @@ public class GridBuilder : MonoBehaviour
             new Vector3(-1, 0, -4),
         }));
     }
+
+    void LoadHeuristics()
+    {
+        heuristics.Add(BiomeType.WATER, new List<BiomeType>
+        {
+            BiomeType.WATER,
+            BiomeType.BEACH,
+            BiomeType.PLAINS
+        });
+
+        heuristics.Add(BiomeType.BEACH, new List<BiomeType>
+        {
+            BiomeType.BEACH,
+            BiomeType.WATER,
+            BiomeType.PLAINS,
+            BiomeType.FOREST,
+            BiomeType.DESERT
+        });
+
+
+        heuristics.Add(BiomeType.PLAINS, new List<BiomeType>
+        {
+            BiomeType.WATER,
+            BiomeType.BEACH,
+            BiomeType.PLAINS,
+            BiomeType.FOREST,
+            BiomeType.MOUNTAIN,
+            BiomeType.SNOW,
+            BiomeType.DESERT,
+            BiomeType.SWAMP,
+            BiomeType.VOLCANIC
+        });
+
+        heuristics.Add(BiomeType.FOREST, new List<BiomeType>
+        {
+            BiomeType.FOREST,
+            BiomeType.PLAINS,
+            BiomeType.MOUNTAIN,
+            BiomeType.SWAMP,
+            BiomeType.BEACH
+        });
+
+
+        heuristics.Add(BiomeType.MOUNTAIN, new List<BiomeType>
+        {
+            BiomeType.MOUNTAIN,
+            BiomeType.PLAINS,
+            BiomeType.FOREST,
+            BiomeType.SNOW
+        });
+
+        heuristics.Add(BiomeType.SNOW, new List<BiomeType>
+        {
+            BiomeType.SNOW,
+            BiomeType.MOUNTAIN,
+            BiomeType.PLAINS
+        });
+
+        heuristics.Add(BiomeType.DESERT, new List<BiomeType>
+        {
+            BiomeType.DESERT,
+            BiomeType.PLAINS,
+            BiomeType.BEACH,
+            BiomeType.VOLCANIC
+        });
+
+        heuristics.Add(BiomeType.SWAMP, new List<BiomeType>
+        {
+            BiomeType.SWAMP,
+            BiomeType.WATER,
+            BiomeType.FOREST,
+            BiomeType.PLAINS
+        });
+
+        heuristics.Add(BiomeType.VOLCANIC, new List<BiomeType>
+        {
+            BiomeType.VOLCANIC,
+            BiomeType.MOUNTAIN,
+            BiomeType.DESERT
+        });
+    }
+
+    // Propagate
+    void BuildBiomes()
+    {
+
+        foreach (KeyValuePair<Vector3, GameObject> pair in tileMap)
+        {
+            TileData data = pair.Value.GetComponent<TileData>();
+
+            if (data.isValid == true)
+            {
+                data.AssignRandomBiome();
+                PropogateBiome(pair.Value);
+                break;
+            }
+        }
+    }
+
+
+    // WFC 
+    // At this step we just put the possible ones first
+    // origin is vec3 where this instance of propagation happens around
+    void PropogateBiome(GameObject origin)
+    {
+        // Check if 8 directions are valid tiles
+        for (int i = -1; i <= 1; i++)
+        {
+            for (int j = -1; j <= 1 ; j++)
+            {
+                Vector3 neighbour = new Vector3(
+                    origin.transform.position.x + i, 
+                    0, 
+                    origin.transform.position.z+j);
+
+                if (origin.transform.position == neighbour)
+                    continue;
+
+                if (tileMap.TryGetValue(neighbour, out GameObject neighbourGO))
+                {
+                    Debug.Log(neighbourGO.transform.position);
+
+                    neighbourGO.GetComponent<Renderer>().material = recent;
+                }
+            }
+        }
+    }
+
+    // Returns true if lhs and rhs can be adjacent 
+    bool CanBiomesBeAdjacent(BiomeType lhs, BiomeType rhs)
+    {
+        return heuristics.ContainsKey(lhs) && heuristics[lhs].Contains(rhs);
+    }
+
 
     // Debugging the shape of dicenet
     // index is index of a specific shape stored in diceNets
