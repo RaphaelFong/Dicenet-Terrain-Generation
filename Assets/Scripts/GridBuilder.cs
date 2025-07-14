@@ -32,8 +32,18 @@ public class GridBuilder : MonoBehaviour
     public Material pre;
     public Material post;
     public Material recent;
-    public TextMeshProUGUI targetDicenetText;   
+    public TextMeshProUGUI targetDicenetText;
     public TextMeshProUGUI warningText;
+
+    public Material waterMat;
+    public Material beachMat;
+    public Material plainsMat;
+    public Material forestMat;
+    public Material mountainMat;
+    public Material snowMat;
+    public Material desertMat;
+    public Material swampMat;
+    public Material volcanicMat;
 
     public const int GRIDSIZE = 20;
     public const float TILESIZE = 1f; // my cubePrefab are slightly smaller than tileSize so can tell apart from each other
@@ -49,7 +59,14 @@ public class GridBuilder : MonoBehaviour
     public int targetDicenet = 0; // default set to 0th element in the diceNet list
 
     // stores the allowed neighbours in 4 directions UP DOWN LEFT RIGHT
-    public Dictionary<BiomeType, List<BiomeType>> heuristics = new Dictionary<BiomeType, List<BiomeType>>(); 
+    public Dictionary<BiomeType, List<BiomeType>> heuristics = new Dictionary<BiomeType, List<BiomeType>>();
+
+    // 4 Directions
+    public Vector3[] directions = new Vector3[] { new Vector3(1,0,0),
+                                                  new Vector3(-1,0,0),
+                                                  new Vector3(0,0,1),
+                                                  new Vector3(0,0,-1) };
+
 
     // Start is called before the first frame update
     void Start()
@@ -72,13 +89,13 @@ public class GridBuilder : MonoBehaviour
         }
 
         targetDicenetText.text = "Selected Dicenet Index : " + targetDicenet;
-    
+
         BuildBiomes();
     }
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Alpha1) && targetDicenet != diceNets.Count - 1) 
+        if (Input.GetKeyDown(KeyCode.Alpha1) && targetDicenet != diceNets.Count - 1)
         {
             targetDicenet++;
             //targetDicenet %= diceNets.Capacity;
@@ -116,7 +133,7 @@ public class GridBuilder : MonoBehaviour
 
 
 
-        Debug.Log($"Grid created with {tileMap.Count} tiles.");
+        //Debug.Log($"Grid created with {tileMap.Count} tiles.");
     }
 
     void PlaceDicenet(int diceNetIndex)
@@ -190,9 +207,9 @@ public class GridBuilder : MonoBehaviour
                 tileMap[v3].GetComponent<TileData>().isValid = true;
                 tileMap[v3].GetComponent<Renderer>().material = post;
             }
-            Debug.Log("Complete Placing First Dicenet");
+            //Debug.Log("Complete Placing First Dicenet");
         }
-        
+
         // This one need calculate adjacency score
         else
         {
@@ -265,12 +282,12 @@ public class GridBuilder : MonoBehaviour
                 }
                 //StartCoroutine(PlaceTilesWithDelay(bestTilePositions));
 
-                Debug.Log($"Placed DiceNet at {bestPlacement} with adjacency score: {bestScore}");
+                //Debug.Log($"Placed DiceNet at {bestPlacement} with adjacency score: {bestScore}");
             }
             else
             {
                 warningText.text = "Insufficient space on board for dicenet index " + diceNetIndex;
-                Debug.LogError("No valid placement found!");
+                //Debug.LogError("No valid placement found!");
             }
 
 
@@ -588,10 +605,12 @@ public class GridBuilder : MonoBehaviour
         });
     }
 
+    Queue<GameObject> propogationQueue = new Queue<GameObject>();
+
     // Propagate
     void BuildBiomes()
     {
-
+        // Choose the first random thing
         foreach (KeyValuePair<Vector3, GameObject> pair in tileMap)
         {
             TileData data = pair.Value.GetComponent<TileData>();
@@ -599,45 +618,139 @@ public class GridBuilder : MonoBehaviour
             if (data.isValid == true)
             {
                 data.AssignRandomBiome();
-                PropogateBiome(pair.Value);
+                ChangeMaterial(pair.Value);
+                //PropogateBiome(pair.Value);
+                propogationQueue.Enqueue(pair.Value);
                 break;
             }
         }
+
+        // Set a temp limit in case it goes infinite loop
+        int recursionCount = 0;
+        int recursionMax = 100;
+
+        // While there is something in the queue
+        while (propogationQueue.Count > 0 && recursionCount < recursionMax)
+        {
+            // pop the first element
+            GameObject poppedGO = propogationQueue.Dequeue();
+
+            // Propogate around the popped gameobject
+            PropogateBiome(poppedGO);
+
+            recursionCount++;
+
+            Debug.Log("End of recursionCount " + recursionCount + " left " + propogationQueue.Count + " in propogationQueue");
+        }
     }
+
 
 
     // WFC 
     // At this step we just put the possible ones first
     // origin is vec3 where this instance of propagation happens around
-    void PropogateBiome(GameObject origin)
+    void PropogateBiome(GameObject source)
     {
-        // Check if 8 directions are valid tiles
-        for (int i = -1; i <= 1; i++)
-        {
-            for (int j = -1; j <= 1 ; j++)
-            {
-                Vector3 neighbour = new Vector3(
-                    origin.transform.position.x + i, 
-                    0, 
-                    origin.transform.position.z+j);
+        TileData sourceData = source.GetComponent<TileData>();
 
-                if (origin.transform.position == neighbour)
+        // Verify valid
+        if (!sourceData.isValid || sourceData.biomeType == BiomeType.UNASSIGNED)
+        {
+            Debug.LogWarning("Invalid PropogateBiome");
+            return;
+        }
+
+        foreach (var dir in directions)
+        {
+            Vector3 neighbour = new Vector3(
+                source.transform.position.x + dir.x,
+                0,
+                source.transform.position.z + dir.y);
+
+            if (source.transform.position == neighbour)
+                continue;
+
+            if (tileMap.TryGetValue(neighbour, out GameObject neighbourGO))
+            {
+                // Check if can be adjacent
+                TileData neighbourData = neighbourGO.GetComponent<TileData>();
+
+                if (!neighbourData.isValid || neighbourData.isCollapsed())
                     continue;
 
-                if (tileMap.TryGetValue(neighbour, out GameObject neighbourGO))
-                {
-                    Debug.Log(neighbourGO.transform.position);
+                BiomeType sourceBiome = sourceData.biomeType;
 
-                    neighbourGO.GetComponent<Renderer>().material = recent;
+                // This line causing error because heuristics dun contain UNDEFINED
+                List<BiomeType> allowed = heuristics[sourceBiome];
+
+                HashSet<BiomeType> filtered = new HashSet<BiomeType>();
+
+                // looks thru the curr possibleTypes and adds them to the
+                // filtered hashset
+                // afterwards the possibleTypes will also be set to this filtered version
+
+                foreach (BiomeType type in neighbourData.possibleTypes)
+                {
+                    if (allowed.Contains(type))
+                        filtered.Add(type);
+                }
+
+                if (filtered.Count != neighbourData.possibleTypes.Count)
+                {
+                    neighbourData.possibleTypes = filtered;
+
+                    // Handle contradiction (no possible types left)
+                    if (neighbourData.possibleTypes.Count == 0)
+                    {
+                        neighbourData.isValid = false;
+                        //Debug.LogWarning($"Contradiction at {neighbourGO.transform.position}");
+                        continue;
+                    }
+
+                    // Collapse if only 1 possible biome 
+                    // Else continue
+                    if (neighbourData.possibleTypes.Count == 1)
+                    {
+                        Debug.Log(neighbourGO.name + " has been collapsed");
+                        neighbourData.biomeType = neighbourData.possibleTypes.First();
+                        ChangeMaterial(neighbourGO);
+                        //neighbourGO.GetComponent<Renderer>().material = recent;
+                    }
+
+                    if (!propogationQueue.Contains(neighbourGO))
+                    {
+                        propogationQueue.Enqueue(neighbourGO);
+                    }
+
+                    //propogationQueue.Enqueue(neighbourGO);
                 }
             }
         }
+
+            
+        
     }
 
     // Returns true if lhs and rhs can be adjacent 
     bool CanBiomesBeAdjacent(BiomeType lhs, BiomeType rhs)
     {
         return heuristics.ContainsKey(lhs) && heuristics[lhs].Contains(rhs);
+    }
+
+    void ChangeMaterial(GameObject go)
+    {
+        switch (go.GetComponent<TileData>().biomeType)
+        { 
+            case BiomeType.WATER: { go.GetComponent<Renderer>().material = waterMat; break; }
+            case BiomeType.BEACH: { go.GetComponent<Renderer>().material = beachMat; break; }
+            case BiomeType.PLAINS: { go.GetComponent<Renderer>().material = plainsMat; break; }
+            case BiomeType.FOREST: { go.GetComponent<Renderer>().material = forestMat; break; }
+            case BiomeType.MOUNTAIN: { go.GetComponent<Renderer>().material = mountainMat; break; }
+            case BiomeType.SNOW: { go.GetComponent<Renderer>().material = snowMat; break; }
+            case BiomeType.DESERT: { go.GetComponent<Renderer>().material = desertMat; break; }
+            case BiomeType.SWAMP: { go.GetComponent<Renderer>().material = swampMat; break; }
+            case BiomeType.VOLCANIC: { go.GetComponent<Renderer>().material = volcanicMat; break; }
+        }
     }
 
 

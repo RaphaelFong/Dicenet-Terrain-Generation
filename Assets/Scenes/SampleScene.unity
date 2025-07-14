@@ -1013,7 +1013,15 @@ MonoBehaviour:
   recent: {fileID: 2100000, guid: 2a074ee43b4e72142b7904bb7e979553, type: 2}
   targetDicenetText: {fileID: 377658127}
   warningText: {fileID: 1203906367}
-  diceNets: []
+  waterMat: {fileID: 2100000, guid: d81aae2ad4bc5a04cb866c6d11af4afa, type: 2}
+  beachMat: {fileID: 2100000, guid: d7a0adb86fb9192438588adb05f698ef, type: 2}
+  plainsMat: {fileID: 2100000, guid: aa2c2fad5ba356540a1270cac845f569, type: 2}
+  forestMat: {fileID: 2100000, guid: 87d2a8fc16b27b84685712a02ecf71a1, type: 2}
+  mountainMat: {fileID: 2100000, guid: 46035167b01d3b5478cbf9174e6882c6, type: 2}
+  snowMat: {fileID: 2100000, guid: 96957f9fcbfb4dc4bb3045f1b60e7b7d, type: 2}
+  desertMat: {fileID: 2100000, guid: 0144a8fc94db0f449969e5de00700998, type: 2}
+  swampMat: {fileID: 2100000, guid: 5030f4a521d892d4189af0048b503a94, type: 2}
+  volcanicMat: {fileID: 2100000, guid: 955285531451e854281dd376bd46a8fd, type: 2}
   tempHolder: []
   mostRecentlyPlaced: []
   bag: 000000000100000002000000030000000400000005000000060000000700000008000000090000000a000000
