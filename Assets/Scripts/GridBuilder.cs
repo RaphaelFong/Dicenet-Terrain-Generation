@@ -91,7 +91,7 @@ public class GridBuilder : MonoBehaviour
 
         targetDicenetText.text = "Selected Dicenet Index : " + targetDicenet;
 
-        BuildBiomes();
+        //BuildBiomes(); // Shifted to Update
     }
 
     void Update()
@@ -99,21 +99,23 @@ public class GridBuilder : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Alpha1) && targetDicenet != diceNets.Count - 1)
         {
             targetDicenet++;
-            //targetDicenet %= diceNets.Capacity;
             targetDicenetText.text = "Selected Dicenet Index : " + targetDicenet;
         }
         if (Input.GetKeyDown(KeyCode.Alpha2) && targetDicenet != 0)
         {
             targetDicenet--;
-            //targetDicenet %= diceNets.Capacity;
             targetDicenetText.text = "Selected Dicenet Index : " + targetDicenet;
         }
 
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            //bagIndex++;
-            //bagIndex %= bag.Capacity;
             PlaceDicenet(targetDicenet);
+        }
+
+        if (Input.GetKeyDown(KeyCode.Q))
+        {
+
+            BuildBiomes();
         }
     }
 
@@ -134,9 +136,6 @@ public class GridBuilder : MonoBehaviour
                 index++;
             }
         }
-
-
-
         //Debug.Log($"Grid created with {tileMap.Count} tiles.");
     }
 
@@ -615,40 +614,136 @@ public class GridBuilder : MonoBehaviour
     void BuildBiomes()
     {
         // Choose the first random thing, note this only selects the first valid in list
-        foreach (KeyValuePair<Vector3, GameObject> pair in tileMap)
-        {
-            TileData data = pair.Value.GetComponent<TileData>();
+        //foreach (KeyValuePair<Vector3, GameObject> pair in tileMap)
+        //{
+        //    TileData data = pair.Value.GetComponent<TileData>();
 
-            if (data.isValid == true)
+        //    if (data.isValid == true)
+        //    {
+        //        data.AssignRandomBiome();
+        //        //ChangeMaterial(pair.Value);
+        //        propogationQueue.Add(pair.Value);
+        //        break;
+        //    }
+        //}
+
+        // 1. FULL RESET
+        propogationQueue.Clear();
+
+        foreach (var kv in tileMap)
+        {
+            TileData data = kv.Value.GetComponent<TileData>();
+            if (data.isValid)
             {
-                data.AssignRandomBiome();
-                //ChangeMaterial(pair.Value);
-                propogationQueue.Add(pair.Value);
-                break;
+                // Reset all valid tiles
+                data.biomeType = BiomeType.UNASSIGNED;
+                data.possibleTypes = new List<BiomeType>() {
+                BiomeType.WATER, BiomeType.BEACH, BiomeType.PLAINS,
+                BiomeType.FOREST, BiomeType.MOUNTAIN, BiomeType.SNOW,
+                BiomeType.DESERT, BiomeType.SWAMP, BiomeType.VOLCANIC
+            };
+                kv.Value.GetComponent<Renderer>().material = post; // Reset visual
             }
         }
 
+        // 2. NEW SEED SELECTION
+        var validTiles = tileMap.Values
+            .Where(go => go.GetComponent<TileData>().isValid)
+            .ToList();
+
+        if (validTiles.Count > 0)
+        {
+            // Random seed tile
+            GameObject seedTile = validTiles[Random.Range(0, validTiles.Count)];
+            seedTile.GetComponent<TileData>().AssignRandomBiomeFromListOfPossible();
+            propogationQueue.Add(seedTile);
+        }
+
+        // 3. PROCESSING LOOP
+
         // Set a temp limit in case it goes infinite loop
         int recursionCount = 0;
-        int recursionMax = 100;
+        int recursionMax = 1000;
 
         // While there is something in the queue
         while (propogationQueue.Count > 0 && recursionCount < recursionMax)
         {
-            // pop the first element
-            //GameObject poppedGO = propogationQueue.Dequeue();
-            
-            GameObject poppedGO = propogationQueue[0];
+            // 1. COLLAPSE PHASE (separate this)
+            GameObject toCollapse = GetLowestEntropyTile(propogationQueue);
+            CollapseTile(toCollapse);
+            propogationQueue.Remove(toCollapse);
 
-            // Propogate around the popped gameobject
-            PropogateBiome(poppedGO);
+            // 2. PROPAGATE PHASE (only from the just-collapsed tile)
+            PropagateConstraints(toCollapse);
 
             recursionCount++;
 
-            Debug.Log("End of recursionCount " + recursionCount + " left " + propogationQueue.Count + " in propogationQueue");
+            if (recursionCount >= recursionMax)
+                Debug.Log("RECURSION MAX REACHED !");
         }
     }
 
+    #region god
+
+    GameObject GetLowestEntropyTile(List<GameObject> queue)
+    {
+        GameObject lowest = null;
+        int minEntropy = int.MaxValue;
+
+        foreach (GameObject go in queue)
+        {
+            int e = go.GetComponent<TileData>().Entropy();
+            if (e < minEntropy)
+            {
+                minEntropy = e;
+                lowest = go;
+            }
+        }
+        return lowest;
+    }
+
+    void CollapseTile(GameObject tile)
+    {
+        TileData data = tile.GetComponent<TileData>();
+        data.AssignRandomBiomeFromListOfPossible();
+        ChangeMaterial(tile);
+    }
+
+    void PropagateConstraints(GameObject source)
+    {
+        TileData sourceData = source.GetComponent<TileData>();
+
+        foreach (var dir in directions)
+        {
+            Vector3 neighborPos = source.transform.position + dir;
+
+            if (tileMap.TryGetValue(neighborPos, out GameObject neighbor))
+            {
+                TileData neighborData = neighbor.GetComponent<TileData>();
+
+                if (!neighborData.isValid || neighborData.isCollapsed())
+                    continue;
+
+                // Filter possibilities
+                List<BiomeType> newPossible = neighborData.possibleTypes
+                    .Where(b => heuristics[sourceData.biomeType].Contains(b))
+                    .ToList();
+
+                // Only if possibilities changed
+                if (newPossible.Count != neighborData.possibleTypes.Count)
+                {
+                    neighborData.possibleTypes = newPossible;
+
+                    if (!propogationQueue.Contains(neighbor))
+                    {
+                        propogationQueue.Add(neighbor);
+                    }
+                }
+            }
+        }
+    }
+
+    #endregion
 
 
     // WFC 

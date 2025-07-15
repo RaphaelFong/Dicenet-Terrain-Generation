@@ -28,16 +28,13 @@ public class TileData : MonoBehaviour
     public void AssignRandomBiome()
     {
         int count = Enum.GetValues(typeof(BiomeType)).Length;
-        Debug.Log(count);
         biomeType = (BiomeType)Random.Range(1, count);
-
-        Debug.LogError("here");
     }
 
     // A random biome from the hashmap of random
     public void AssignRandomBiomeFromListOfPossible()
     {
-        int random = Random.Range(0, possibleTypes.Count - 1);
+        int random = Random.Range(1, possibleTypes.Count);
         biomeType = possibleTypes[random];
     }
 
