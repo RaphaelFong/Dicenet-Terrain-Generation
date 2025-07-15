@@ -11,6 +11,7 @@ using UnityEngine;
 
 using Vector3 = UnityEngine.Vector3;
 using Quaternion = UnityEngine.Quaternion;
+using UnityEngine.XR;
 
 public enum BiomeType
 {
@@ -120,14 +121,17 @@ public class GridBuilder : MonoBehaviour
     // Dun ask me why not start from top left, idw calc offset
     void BuildGrid()
     {
+        int index = 1;
+
         for (int x = 0; x < GRIDSIZE; x++)
         {
             for (int z = 0; z < GRIDSIZE; z++)
             {
                 Vector3 pos = new Vector3(x * TILESIZE, 0, z * TILESIZE);
                 GameObject tile = Instantiate(cubePrefab, pos, Quaternion.identity, transform);
-                tile.name = $"Tile ({x},{z})";
+                tile.name = index + $"Tile ({x},{z})";
                 tileMap[pos] = tile;
+                index++;
             }
         }
 
@@ -605,12 +609,12 @@ public class GridBuilder : MonoBehaviour
         });
     }
 
-    Queue<GameObject> propogationQueue = new Queue<GameObject>();
+    List<GameObject> propogationQueue = new List<GameObject>();
 
     // Propagate
     void BuildBiomes()
     {
-        // Choose the first random thing
+        // Choose the first random thing, note this only selects the first valid in list
         foreach (KeyValuePair<Vector3, GameObject> pair in tileMap)
         {
             TileData data = pair.Value.GetComponent<TileData>();
@@ -618,9 +622,8 @@ public class GridBuilder : MonoBehaviour
             if (data.isValid == true)
             {
                 data.AssignRandomBiome();
-                ChangeMaterial(pair.Value);
-                //PropogateBiome(pair.Value);
-                propogationQueue.Enqueue(pair.Value);
+                //ChangeMaterial(pair.Value);
+                propogationQueue.Add(pair.Value);
                 break;
             }
         }
@@ -633,7 +636,9 @@ public class GridBuilder : MonoBehaviour
         while (propogationQueue.Count > 0 && recursionCount < recursionMax)
         {
             // pop the first element
-            GameObject poppedGO = propogationQueue.Dequeue();
+            //GameObject poppedGO = propogationQueue.Dequeue();
+            
+            GameObject poppedGO = propogationQueue[0];
 
             // Propogate around the popped gameobject
             PropogateBiome(poppedGO);
@@ -653,9 +658,28 @@ public class GridBuilder : MonoBehaviour
     {
         TileData sourceData = source.GetComponent<TileData>();
 
-        // Verify valid
-        if (!sourceData.isValid || sourceData.biomeType == BiomeType.UNASSIGNED)
+        int lowest = int.MaxValue;
+        GameObject lowestGO = null; // temp holder to pop the go with lowest entropy
+
+        // Collapse lowest entropy
+        foreach(GameObject go in propogationQueue)
         {
+            if (lowest > go.GetComponent<TileData>().Entropy())
+            {
+                lowest = go.GetComponent<TileData>().Entropy();
+                lowestGO = go;
+            }
+        }
+
+        lowestGO.GetComponent<TileData>().AssignRandomBiomeFromListOfPossible();
+        ChangeMaterial(lowestGO);
+        propogationQueue.Remove(lowestGO);
+
+
+        // Verify valid
+        //if (!sourceData.isValid || sourceData.biomeType == BiomeType.UNASSIGNED)
+        if (!sourceData.isValid)
+            {
             Debug.LogWarning("Invalid PropogateBiome");
             return;
         }
@@ -683,7 +707,7 @@ public class GridBuilder : MonoBehaviour
                 // This line causing error because heuristics dun contain UNDEFINED
                 List<BiomeType> allowed = heuristics[sourceBiome];
 
-                HashSet<BiomeType> filtered = new HashSet<BiomeType>();
+                List<BiomeType> filtered = new List<BiomeType>();
 
                 // looks thru the curr possibleTypes and adds them to the
                 // filtered hashset
@@ -700,35 +724,28 @@ public class GridBuilder : MonoBehaviour
                     neighbourData.possibleTypes = filtered;
 
                     // Handle contradiction (no possible types left)
-                    if (neighbourData.possibleTypes.Count == 0)
-                    {
-                        neighbourData.isValid = false;
-                        //Debug.LogWarning($"Contradiction at {neighbourGO.transform.position}");
-                        continue;
-                    }
+                    //if (neighbourData.possibleTypes.Count == 0)
+                    //{
+                    //    neighbourData.isValid = false;
+                    //    continue;
+                    //}
 
                     // Collapse if only 1 possible biome 
                     // Else continue
-                    if (neighbourData.possibleTypes.Count == 1)
-                    {
-                        Debug.Log(neighbourGO.name + " has been collapsed");
-                        neighbourData.biomeType = neighbourData.possibleTypes.First();
-                        ChangeMaterial(neighbourGO);
-                        //neighbourGO.GetComponent<Renderer>().material = recent;
-                    }
+                    //if (neighbourData.possibleTypes.Count == 1)
+                    //{
+                    //    neighbourData.AssignRandomBiomeFromListOfPossible();
+                    //    ChangeMaterial(neighbourGO);
+                    //}
 
                     if (!propogationQueue.Contains(neighbourGO))
                     {
-                        propogationQueue.Enqueue(neighbourGO);
+                        propogationQueue.Add(neighbourGO);
                     }
 
-                    //propogationQueue.Enqueue(neighbourGO);
                 }
             }
         }
-
-            
-        
     }
 
     // Returns true if lhs and rhs can be adjacent 

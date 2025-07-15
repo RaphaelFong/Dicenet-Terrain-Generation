@@ -9,7 +9,7 @@ public class TileData : MonoBehaviour
 {
     public bool isValid = false; // True means there's tile here but yet to assign biome
     public BiomeType biomeType = BiomeType.UNASSIGNED;
-    public HashSet<BiomeType> possibleTypes = new HashSet<BiomeType>();
+    public List<BiomeType> possibleTypes = new List<BiomeType>();
 
     void Awake()
     {
@@ -24,7 +24,7 @@ public class TileData : MonoBehaviour
         possibleTypes.Add(BiomeType.VOLCANIC);
     }
 
-
+    // Truly can be any biome
     public void AssignRandomBiome()
     {
         int count = Enum.GetValues(typeof(BiomeType)).Length;
@@ -34,21 +34,21 @@ public class TileData : MonoBehaviour
         Debug.LogError("here");
     }
 
-    // return true if sizeof hashset possible type is 1
-    //public bool isCollapsed()
-    //{
-    //    Debug.Log("possibleTypes.Count" + possibleTypes.Count);
-    //    return (possibleTypes.Count == 1) ? true : false;
-    //}
+    // A random biome from the hashmap of random
+    public void AssignRandomBiomeFromListOfPossible()
+    {
+        int random = Random.Range(0, possibleTypes.Count - 1);
+        biomeType = possibleTypes[random];
+    }
+
+    // Return number of element in possibleTypes
+    public int Entropy()
+    {
+        return possibleTypes.Count;
+    }
 
     public bool isCollapsed()
     {
         return biomeType != BiomeType.UNASSIGNED;
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
     }
 }
