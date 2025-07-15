@@ -1,4 +1,3 @@
-//using Palmmedia.ReportGenerator.Core.Parser.Analysis;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,12 +5,14 @@ using System.Numerics;
 using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
-//using static UnityEditor.Experimental.GraphView.GraphView;
-//using UnityEngine.Assertions;
+
 
 using Vector3 = UnityEngine.Vector3;
 using Quaternion = UnityEngine.Quaternion;
+using Button = UnityEngine.UI.Button;
 using UnityEngine.XR;
+using UnityEngine.UI;
+using UnityEngine.UIElements;
 
 public enum BiomeType
 {
@@ -35,6 +36,10 @@ public class GridBuilder : MonoBehaviour
     public Material recent;
     public TextMeshProUGUI targetDicenetText;
     public TextMeshProUGUI warningText;
+    public TextMeshProUGUI bagText;
+
+    public Button shopButton;
+    public GameObject shopPanel;
 
     public Material waterMat;
     public Material beachMat;
@@ -49,6 +54,8 @@ public class GridBuilder : MonoBehaviour
     public const int GRIDSIZE = 20;
     public const float TILESIZE = 1f; // my cubePrefab are slightly smaller than tileSize so can tell apart from each other
 
+    // The grid structure of the 20x20, if anywhere other than BuildGrid
+    // add/remove this element you fked up ...
     public Dictionary<Vector3, GameObject> tileMap = new Dictionary<Vector3, GameObject>();
     private List<Dicenet> diceNets = new List<Dicenet>(); // Stores the 11 polyhedral dicenets
     public List<Vector3> tempHolder; // remember to clear after using
@@ -67,6 +74,9 @@ public class GridBuilder : MonoBehaviour
                                                   new Vector3(-1,0,0),
                                                   new Vector3(0,0,1),
                                                   new Vector3(0,0,-1) };
+
+    // Not exactly a queue a list now...
+    List<GameObject> propogationQueue = new List<GameObject>();
 
 
     // Start is called before the first frame update
@@ -89,9 +99,13 @@ public class GridBuilder : MonoBehaviour
             PlaceDicenet(i);
         }
 
+        
+
         targetDicenetText.text = "Selected Dicenet Index : " + targetDicenet;
 
         //BuildBiomes(); // Shifted to Update
+
+
     }
 
     void Update()
@@ -112,16 +126,85 @@ public class GridBuilder : MonoBehaviour
             PlaceDicenet(targetDicenet);
         }
 
-        if (Input.GetKeyDown(KeyCode.Q))
-        {
+        //if (Input.GetKeyDown(KeyCode.Q))
+        //{
+        //    // Reset
+        //    foreach (KeyValuePair<Vector3, GameObject> kv in tileMap)
+        //    {
+        //        kv.Value.SetActive(true);
+        //    }
 
-            BuildBiomes();
+        //    BuildBiomes();
+
+        //    // Those white and black tiles set to inactive
+        //    // white - no dicenet placed
+        //    // black - no biomed placed
+        //    foreach (KeyValuePair<Vector3, GameObject> kv in tileMap)
+        //    {
+        //        TileData tileData = kv.Value.GetComponent<TileData>();
+
+        //        // white tiles
+        //        if (!tileData.isValid)
+        //        {
+        //            kv.Value.SetActive(false);
+        //            continue;
+        //        }
+
+        //        // black tiles
+        //        if (tileData.biomeType == BiomeType.UNASSIGNED)
+        //        {
+        //            kv.Value.SetActive(false);
+        //        }
+        //    }
+        //}
+
+        // OG code Without the cleanup
+        //if (Input.GetKeyDown(KeyCode.W))
+        //{
+        //    // Reset
+        //    foreach (KeyValuePair<Vector3, GameObject> kv in tileMap)
+        //    {
+        //        kv.Value.SetActive(true);
+        //    }
+
+        //    BuildBiomes();
+        //}
+
+        //if (Input.GetKeyDown(KeyCode.E))
+        //{
+        //    foreach (int i in bag)
+        //    {
+        //        PlaceDicenet(i);
+        //    }
+        //}
+
+        //if (Input.GetKeyDown(KeyCode.R))
+        //{
+        //    foreach (KeyValuePair<Vector3, GameObject> kv in tileMap)
+        //    {
+        //        kv.Value.GetComponent<Renderer>().material = pre;
+        //        kv.Value.GetComponent<TileData>().ResetTileData();
+        //    }
+
+        //    propogationQueue.Clear();
+        //    mostRecentlyPlaced.Clear();
+        //    tempHolder.Clear();
+        //}
+
+
+        string tempText = "";
+
+        foreach (int i in bag)
+        {
+            tempText += i + ",";
         }
+
+        bagText.text = tempText;
     }
 
-    // Builds from bot left (0,0,0) to top right (19,0,19)
-    // Dun ask me why not start from top left, idw calc offset
-    void BuildGrid()
+// Builds from bot left (0,0,0) to top right (19,0,19)
+// Dun ask me why not start from top left, idw calc offset
+void BuildGrid()
     {
         int index = 1;
 
@@ -608,25 +691,10 @@ public class GridBuilder : MonoBehaviour
         });
     }
 
-    List<GameObject> propogationQueue = new List<GameObject>();
 
     // Propagate
     void BuildBiomes()
     {
-        // Choose the first random thing, note this only selects the first valid in list
-        //foreach (KeyValuePair<Vector3, GameObject> pair in tileMap)
-        //{
-        //    TileData data = pair.Value.GetComponent<TileData>();
-
-        //    if (data.isValid == true)
-        //    {
-        //        data.AssignRandomBiome();
-        //        //ChangeMaterial(pair.Value);
-        //        propogationQueue.Add(pair.Value);
-        //        break;
-        //    }
-        //}
-
         // 1. FULL RESET
         propogationQueue.Clear();
 
@@ -668,7 +736,7 @@ public class GridBuilder : MonoBehaviour
         // While there is something in the queue
         while (propogationQueue.Count > 0 && recursionCount < recursionMax)
         {
-            // 1. COLLAPSE PHASE (separate this)
+            // 1. COLLAPSE PHASE
             GameObject toCollapse = GetLowestEntropyTile(propogationQueue);
             CollapseTile(toCollapse);
             propogationQueue.Remove(toCollapse);
@@ -876,5 +944,92 @@ public class GridBuilder : MonoBehaviour
         }   
     }
 
+    public void ToggleShop()
+    {
+        shopPanel.SetActive(!shopPanel.activeSelf);
+    }
 
+    public void AddDicenetToBag(int index)
+    {
+        if (index >= 0 && index <= 10)
+            bag.Add(index);
+    }
+
+    public void RemoveBagFront()
+    {
+        bag.Remove(bag.First());
+    }
+
+    public void RemoveBagBack()
+    {
+        bag.Remove(bag.Count - 1);
+    }
+
+    // Q
+    public void BuildBiomeOnly()
+    {
+        // Reset
+        foreach (KeyValuePair<Vector3, GameObject> kv in tileMap)
+        {
+            kv.Value.SetActive(true);
+        }
+
+        BuildBiomes();
+
+        // Those white and black tiles set to inactive
+        // white - no dicenet placed
+        // black - no biomed placed
+        foreach (KeyValuePair<Vector3, GameObject> kv in tileMap)
+        {
+            TileData tileData = kv.Value.GetComponent<TileData>();
+
+            // white tiles
+            if (!tileData.isValid)
+            {
+                kv.Value.SetActive(false);
+                continue;
+            }
+
+            // black tiles
+            if (tileData.biomeType == BiomeType.UNASSIGNED)
+            {
+                kv.Value.SetActive(false);
+            }
+        }
+    }
+
+    // W
+    public void BuildBiomeWithWhiteBlack()
+    {
+        // Reset
+        foreach (KeyValuePair<Vector3, GameObject> kv in tileMap)
+        {
+            kv.Value.SetActive(true);
+        }
+
+        BuildBiomes();
+    }
+
+    // E
+    public void PlaceDicenetUsingBag()
+    {
+        foreach (int i in bag)
+        {
+            PlaceDicenet(i);
+        }
+    }
+    
+    // R
+    public void ResetGrid()
+    {
+        foreach (KeyValuePair<Vector3, GameObject> kv in tileMap)
+        {
+            kv.Value.GetComponent<Renderer>().material = pre;
+            kv.Value.GetComponent<TileData>().ResetTileData();
+        }
+
+        propogationQueue.Clear();
+        mostRecentlyPlaced.Clear();
+        tempHolder.Clear();
+    }
 }

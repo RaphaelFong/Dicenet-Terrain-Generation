@@ -13,15 +13,16 @@ public class TileData : MonoBehaviour
 
     void Awake()
     {
-        possibleTypes.Add(BiomeType.WATER);
-        possibleTypes.Add(BiomeType.BEACH);
-        possibleTypes.Add(BiomeType.PLAINS);
-        possibleTypes.Add(BiomeType.FOREST);
-        possibleTypes.Add(BiomeType.MOUNTAIN);
-        possibleTypes.Add(BiomeType.SNOW);
-        possibleTypes.Add(BiomeType.DESERT);
-        possibleTypes.Add(BiomeType.SWAMP);
-        possibleTypes.Add(BiomeType.VOLCANIC);
+        //possibleTypes.Add(BiomeType.WATER);
+        //possibleTypes.Add(BiomeType.BEACH);
+        //possibleTypes.Add(BiomeType.PLAINS);
+        //possibleTypes.Add(BiomeType.FOREST);
+        //possibleTypes.Add(BiomeType.MOUNTAIN);
+        //possibleTypes.Add(BiomeType.SNOW);
+        //possibleTypes.Add(BiomeType.DESERT);
+        //possibleTypes.Add(BiomeType.SWAMP);
+        //possibleTypes.Add(BiomeType.VOLCANIC);
+        ResetTileData();
     }
 
     // Truly can be any biome
@@ -36,6 +37,22 @@ public class TileData : MonoBehaviour
     {
         int random = Random.Range(1, possibleTypes.Count);
         biomeType = possibleTypes[random];
+    }
+
+    public void ResetTileData()
+    {
+        isValid = false;
+        biomeType = BiomeType.UNASSIGNED;
+        possibleTypes.Clear();
+        possibleTypes.Add(BiomeType.WATER);
+        possibleTypes.Add(BiomeType.BEACH);
+        possibleTypes.Add(BiomeType.PLAINS);
+        possibleTypes.Add(BiomeType.FOREST);
+        possibleTypes.Add(BiomeType.MOUNTAIN);
+        possibleTypes.Add(BiomeType.SNOW);
+        possibleTypes.Add(BiomeType.DESERT);
+        possibleTypes.Add(BiomeType.SWAMP);
+        possibleTypes.Add(BiomeType.VOLCANIC);
     }
 
     // Return number of element in possibleTypes
