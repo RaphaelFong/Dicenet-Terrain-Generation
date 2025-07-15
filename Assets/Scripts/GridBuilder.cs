@@ -79,6 +79,8 @@ public class GridBuilder : MonoBehaviour
     List<GameObject> propogationQueue = new List<GameObject>();
 
 
+
+
     // Start is called before the first frame update
     void Start()
     {
@@ -124,6 +126,11 @@ public class GridBuilder : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Space))
         {
             PlaceDicenet(targetDicenet);
+        }
+
+        if (Input.GetKeyDown(KeyCode.Alpha3))
+        {
+            EnableFullGrid();
         }
 
         //if (Input.GetKeyDown(KeyCode.Q))
@@ -198,6 +205,9 @@ public class GridBuilder : MonoBehaviour
         {
             tempText += i + ",";
         }
+
+        if (tempText == "")
+            tempText = "Bag is Empty";
 
         bagText.text = tempText;
     }
@@ -299,7 +309,7 @@ void BuildGrid()
         // This one need calculate adjacency score
         else
         {
-            #region GPT - with no consideration to rotation yet
+            #region with no consideration to rotation yet
 
             int bestScore = -1;
             Vector3 bestPlacement = Vector3.zero;
@@ -361,8 +371,7 @@ void BuildGrid()
                 foreach (Vector3 pos in bestTilePositions)
                 {
                     tileMap[pos].GetComponent<TileData>().isValid = true;
-                    //tileMap[pos].GetComponent<Renderer>().material = post;
-                    tileMap[pos].GetComponent<Renderer>().material = recent;
+                    //tileMap[pos].GetComponent<Renderer>().material = recent;
 
                     mostRecentlyPlaced.Add(tileMap[pos]);
                 }
@@ -396,16 +405,6 @@ void BuildGrid()
 
         return true;
     }
-
-    //IEnumerator PlaceTilesWithDelay(List<Vector3> tilePos)
-    //{
-    //    foreach(Vector3 pos in tilePos)
-    //    {
-    //        tileMap[pos].GetComponent<TileData>().isValid = true;
-    //        tileMap[pos].GetComponent<Renderer>().material = post;
-    //        yield return new WaitForSeconds(1f);
-    //    }
-    //}
 
     void LoadDicenets()
     {
@@ -739,7 +738,7 @@ void BuildGrid()
             // 1. COLLAPSE PHASE
             GameObject toCollapse = GetLowestEntropyTile(propogationQueue);
             CollapseTile(toCollapse);
-            propogationQueue.Remove(toCollapse);
+            propogationQueue.Remove(toCollapse); // i shd shift this to CollapseTile
 
             // 2. PROPAGATE PHASE (only from the just-collapsed tile)
             PropagateConstraints(toCollapse);
@@ -751,7 +750,6 @@ void BuildGrid()
         }
     }
 
-    #region god
 
     GameObject GetLowestEntropyTile(List<GameObject> queue)
     {
@@ -810,8 +808,6 @@ void BuildGrid()
             }
         }
     }
-
-    #endregion
 
 
     // WFC 
@@ -1024,6 +1020,7 @@ void BuildGrid()
     {
         foreach (KeyValuePair<Vector3, GameObject> kv in tileMap)
         {
+            kv.Value.SetActive(true);
             kv.Value.GetComponent<Renderer>().material = pre;
             kv.Value.GetComponent<TileData>().ResetTileData();
         }
@@ -1031,5 +1028,16 @@ void BuildGrid()
         propogationQueue.Clear();
         mostRecentlyPlaced.Clear();
         tempHolder.Clear();
+    }
+
+    // Instead of using dicenets, this function ignores the concept of dicenet and 
+    // set each of the 20x20 tile to be valid for propagation
+    public void EnableFullGrid()
+    {
+        foreach (KeyValuePair<Vector3, GameObject> kv in tileMap)
+        {
+            kv.Value.GetComponent<TileData>().isValid = true;
+            kv.Value.GetComponent<Renderer>().material = post;
+        }
     }
 }
